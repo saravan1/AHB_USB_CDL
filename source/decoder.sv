@@ -3,7 +3,7 @@ module decoder (
   input logic n_rst,
   input logic d_high,
   input logic shift_enable,
-  input logic EOP,
+  input logic eop,
   output logic d_sent
 );
 
