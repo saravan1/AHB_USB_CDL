@@ -12,8 +12,10 @@ module encoder(
 	input wire serial_out,
 	input wire eop_flag,
 	input wire shift_enable,
+	input wire reset_out,
 	output reg Dplus_out,
-	output reg Dminus_out
+	output reg Dminus_out,
+	output reg packet_done
 );
 
 	reg next_Dplus_out;
@@ -32,12 +34,17 @@ module encoder(
 	always_comb begin
 		next_Dplus_out = Dplus_out;
 		next_Dminus_out = Dminus_out;
+		packet_done = 1'b0;
 		if(eop_flag && shift_enable) begin
 			next_Dplus_out = 1'b0;
 			next_Dminus_out = 1'b0;
+			packet_done = 1'b1;
 		end else if(!serial_out && shift_enable) begin
 			next_Dplus_out = ~Dplus_out; 
 			next_Dminus_out = ~Dminus_out;
+		end else if (reset_out) begin
+			next_Dplus_out = 1'b1;
+			next_Dminus_out = 1'b0;
 		end
 	end
 

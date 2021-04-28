@@ -15,13 +15,15 @@ module control(
 	input wire [7:0] tx_packet_data,
 	input wire [6:0] buffer_occupancy,
 	input wire byte_sent,
+	input wire packet_done,
 	output reg eop_flag,
 	output reg load_enable,
 	output reg [7:0] parallel_in,
 	output reg tx_error,
 	output reg get_tx_packet_data,
 	output reg tx_transfer_active,
-	output reg enable_timer
+	output reg enable_timer,
+	output reg reset_out
 );
 	stateType state, next_state;
 	
@@ -66,10 +68,10 @@ module control(
 						end
 					end
 			CR1LOAD: next_state = CR1;
-			CR1: next_state = (byte_sent) ? CR2 : CR1;
+			CR1: next_state = (byte_sent) ? CR2LOAD : CR1;
 			CR2LOAD: next_state = CR2;
-			CR2: next_state = (byte_sent) ? EOP : CR1;
-			EOP: next_state = EOP1;
+			CR2: next_state = (byte_sent) ? EOP : CR2;
+			EOP: next_state = (packet_done) ? EOP1 : EOP;
 			EOP1: next_state = IDLE;
 			ERROR: next_state = IDLE;
 		endcase
@@ -79,19 +81,7 @@ module control(
 		enable_timer = 1'b1;
 		if(state == IDLE) begin
 			enable_timer = 1'b0;
-		end else if(state == GETDATA) begin
-			enable_timer = 1'b0;
 		end else if(state == ERROR) begin 
-			enable_timer = 1'b0;
-		end else if(state == SYNCLOAD) begin
-			enable_timer = 1'b0;
-		end else if(state == PIDLOAD) begin
-			enable_timer = 1'b0;
-		end else if(state == DATALOAD) begin
-			enable_timer = 1'b0;
-		end else if(state == CR1LOAD) begin
-			enable_timer = 1'b0;
-		end else if(state == CR2LOAD) begin
 			enable_timer = 1'b0;
 		end
 	end
@@ -123,7 +113,8 @@ module control(
 		if(state == SYNCLOAD) begin
 			parallel_in = 8'd1;
 		end else if(state == PIDLOAD) begin
-			parallel_in = {~tx_packet, tx_packet};
+			parallel_in = 
+{tx_packet[0], tx_packet[1], tx_packet[2], tx_packet[3], ~tx_packet[0], ~tx_packet[1], ~tx_packet[2], ~tx_packet[3]};
 		end else if(state == DATALOAD) begin
 			parallel_in = tx_packet_data;
 		end else if(state == CR1LOAD) begin
@@ -153,6 +144,13 @@ module control(
 			eop_flag = 1'b1; 
 		end else if(state == EOP1) begin
 			eop_flag = 1'b1;
+		end
+	end
+
+	always_comb begin
+		reset_out = 1'b0;
+		if(state == IDLE) begin
+			reset_out = 1'b1;
 		end
 	end
 endmodule

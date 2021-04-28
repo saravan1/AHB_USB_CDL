@@ -14,9 +14,9 @@ module timer (
 	output reg byte_sent
 );
 	reg [3:0] count_out_one;
-	flex_counter SE (.clk(clk), .n_rst(n_rst), .clear(~enable_timer), .count_enable(enable_timer), 
+	tx_flex_counter SE (.clk(clk), .n_rst(n_rst), .clear(~enable_timer), .count_enable(enable_timer), 
 	.rollover_val(4'd5), .count_out(count_out_one), .rollover_flag());
-	flex_counter PD (.clk(clk), .n_rst(n_rst), .clear(~enable_timer), .count_enable(shift_enable), 
+	tx_flex_counter PD (.clk(clk), .n_rst(n_rst), .clear(~enable_timer), .count_enable(shift_enable), 
 	.rollover_val(4'd8), .count_out(), .rollover_flag(byte_sent));
 	always_comb begin
 		shift_enable = 1'b0;
