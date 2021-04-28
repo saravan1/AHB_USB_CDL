@@ -26,7 +26,7 @@ module usb_rx (
   logic PID_mode;
   logic PID_error;
   logic PID_clear;
-  logic [7:0] PID_byte;
+  logic [3:0] PID_byte;
 
   //main mapped working
   sync_high s_h (

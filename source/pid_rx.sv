@@ -6,18 +6,18 @@ module pid_rx (
   input logic PID_mode,
   output logic PID_err,
   output logic [3:0] rx_packet,
-  output logic [7:0] PID_byte
+  output logic [3:0] PID_byte
 );
   logic [7:0] hold;
   logic [7:0] next_hold;
 
-  assign rx_packet = hold[3:0];
+  assign rx_packet = hold[7:4];
 
-  localparam in = 4'b0001;
-  localparam out = 4'b1001;
-  localparam data0 = 4'b0011;
-  localparam data1 = 4'b1011;
-  localparam ack = 4'b0010;
+  localparam out = 8'b10000111;
+  localparam in = 8'b10010110;
+  localparam data0 = 8'b11000011;
+  localparam data1 = 8'b11010010;
+  localparam ack = 8'b01001011;
   //localparam nak = 4'b1010;
   //localparam stall = 4'b1110;
 
@@ -47,6 +47,16 @@ module pid_rx (
     end
   end
 
-  assign PID_byte = {~rx_packet, rx_packet};
-  assign PID_err = !((rx_packet == data0) || (rx_packet == data1) || (rx_packet == ack) || (rx_packet == in) || (rx_packet == out));
+  // 0010 0100 1011 first flipped and then flipped inverse
+  //assign PID_byte = { rx_packet[0],rx_packet[1],rx_packet[2],rx_packet[3],
+   //                   ~rx_packet[0],~rx_packet[1],~rx_packet[2],~rx_packet[3]};
+
+  assign PID_byte = rx_packet;
+
+  assign PID_err = !((rx_packet == data0[7:4]) || 
+                     (rx_packet == data1[7:4]) || 
+                     (rx_packet == ack[7:4]) || 
+                     (rx_packet == in[7:4]) || 
+                     (rx_packet == out[7:4]));
+
 endmodule

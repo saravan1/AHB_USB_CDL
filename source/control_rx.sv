@@ -7,7 +7,7 @@ module control_rx (
   input logic [7:0] rcv_data,
   input logic byte_received,
   input logic PID_error,
-  input logic [7:0] PID_byte,
+  input logic [3:0] PID_byte,
   input logic [6:0] buffer_occupancy,
   output logic write_en,
   output logic EOP_err,
@@ -20,8 +20,8 @@ module control_rx (
   typedef enum bit[4:0] {IDLE, SYN_CHK, 
                          PID_WAIT, PID_RECV, PID_WRITE, PID_CHECK, 
                          WAIT, RECV, WRITE,
-                         TOKEN, TOKEN2, TOKEN_IDLE,
-                         DATA_DLE, DATA1, DATA2, DATA3, 
+                         TOKEN1, TOKEN2, TOKEN_DONE,
+                         DATA_IDLE, DATA1, DATA2, DATA3, 
                          EOP_IDLE,EOP, RX_ERR, DONE} statelogic;
   statelogic state;
   statelogic n_state;
@@ -33,7 +33,7 @@ module control_rx (
   // assign PID_clear = out[1];
   // assign PID_mode = out[0];
   
-  // localparam hold_byte = 8'b10000000;
+  localparam hold_byte = 8'b10000000;
   // localparam idle_byte = '0;
   // localparam sync_byte = 5'b10010;
   // localparam pid_byte = 5'b10000;
@@ -163,13 +163,13 @@ module control_rx (
       end
       PID_CHECK: 
       begin
-        if ((PID_byte == 8'b11000011) || (PID_byte == 8'b01001011))
+        if ((PID_byte == 4'b1100) || (PID_byte == 4'b1101))
         begin
           n_state = DATA_IDLE;
         end
-        else if ((PID_byte == 8'b11100001) || (PID_byte == 8'b01101001))
+        else if ((PID_byte == 4'b1000) || (PID_byte == 4'b1001))
         begin
-          n_state = TOKEN;
+          n_state = TOKEN1;
         end
         else if(PID_error)
         begin
