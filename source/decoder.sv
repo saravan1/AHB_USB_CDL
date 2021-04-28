@@ -1,7 +1,7 @@
 module decoder (
   input logic clk,
   input logic n_rst,
-  input logic d_high,
+  input logic dplus_in,
   input logic shift_enable,
   input logic eop,
   output logic d_sent
@@ -17,7 +17,7 @@ module decoder (
   begin
     if(n_rst != 0) 
     begin
-      main_hold <= d_high;
+      main_hold <= dplus_in;
       end_hold <= n_hold;
     end 
     else 

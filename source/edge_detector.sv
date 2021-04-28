@@ -1,7 +1,7 @@
 module edge_detector (
   input logic clk,
   input logic n_rst,
-  input logic d_high,
+  input logic dplus_in,
   output logic edge_detect
 );
   logic main_hold;
@@ -13,7 +13,7 @@ module edge_detector (
   always_comb 
   begin
     edge_detect = main_hold ^ main_hold2;
-    n_hold = d_high;
+    n_hold = dplus_in;
     n_hold2 = main_hold;
   end
 

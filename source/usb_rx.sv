@@ -50,17 +50,17 @@ module usb_rx (
   EOP_detector ep1 (
     .dplus_in(dplus_in), 
     .dminus_in(dminus_in), 
-    .EOP(EOP_detect));
+    .eop(EOP_detect));
 
   decoder d1 (
     .clk(clk), 
     .n_rst(n_rst), 
     .dplus_in(dplus_in), 
     .shift_enable(shift_enable), 
-    .EOP(EOP_detect), 
+    .eop(EOP_detect), 
     .d_sent(d_sent));
 
-  timer t1 (
+  timer_rx t1 (
     .clk(clk), 
     .n_rst(n_rst), 
     .enable_timer(edge_detect), 
@@ -99,7 +99,7 @@ module usb_rx (
     .rcv_data(recv_data[7:0]), 
     .PID_clear(PID_clear), 
     .PID_mode(PID_mode), 
-    .PID_error(PID_error), 
+    .PID_err(PID_error), 
     .rx_packet(rx_packet), 
     .PID_byte(PID_byte));
   

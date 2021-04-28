@@ -1,12 +1,12 @@
-module eop_detector (
-  input logic d_high,
-  input logic d_low,
+module EOP_detector (
+  input logic dplus_in,
+  input logic dminus_in,
   output logic eop
 );
 
 always_comb 
 begin
-  if(d_high == 0 && d_low == 0)
+  if(dplus_in == 0 && dminus_in == 0)
     begin
       eop = 1;
     end

@@ -41,7 +41,7 @@ module tb_usb_rx ();
   endtask
 
   task send_byte;
-    [7:0] target;
+    input logic [7:0] target;
     integer i;
     integer count_one;
   begin
@@ -60,7 +60,7 @@ module tb_usb_rx ();
   endtask
 
   task send_PID;
-    [3:0]PID;
+    input logic [3:0]PID;
   begin
     send_byte({PID[0],PID[1],PID[2],PID[3],~PID[0],~PID[1],~PID[2],~PID[3]});
   end
@@ -75,7 +75,7 @@ module tb_usb_rx ();
       tb_dplus_in = 0;
       tb_dminus_in = 0;
       #(CLK_PERIOD * 8);
-      tb_bit_num ++;
+      tb_bit_num++;
     end
     tb_dplus_in = 1;
     #(CLK_PERIOD * 8);
@@ -83,7 +83,7 @@ module tb_usb_rx ();
   endtask
 
   task send_bit;
-    integer target;
+    input logic target;
   begin
     if(target) begin
       tb_count_one++;
@@ -132,7 +132,7 @@ module tb_usb_rx ();
   endtask
 
   task check_PID;
-    logic [3:0] expected_PID;
+    input logic [3:0] expected_PID;
   begin
     if(tb_PID == expected_PID) begin
       $info("All Good: Pid: %d. %s", tb_test_num, tb_test_description);
@@ -215,11 +215,11 @@ module tb_usb_rx ();
     send_byte(tb_test_byte);
     send_eop();
     #(CLK_PERIOD * 3);
-    read_fifo(8'b00000000);
+   // read_fifo(8'b00000000);
     #(CLK_PERIOD);
-    read_fifo(8'b01000000);
+   // read_fifo(8'b01000000);
     #(CLK_PERIOD);
-    read_fifo(8'b01100001);
+  //  read_fifo(8'b01100001);
 
     // Test Case 4 // 
     // SYNC Error case
