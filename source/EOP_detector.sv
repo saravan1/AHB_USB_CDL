@@ -1,7 +1,7 @@
 module eop_detector (
   input logic d_high,
   input logic d_low,
-  output logic EOP
+  output logic eop
 );
 
 always_comb 
