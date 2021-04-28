@@ -23,21 +23,99 @@ module ahb_lite_usb
     output reg hready,
     output reg hresp,
     output reg dplus_out,
-    output reg dminus_out,
+    output reg dminus_out
+);
+	reg clear;
+	reg flush;
+	reg [2:0] rx_packet;
+	reg rx_data_ready;
+	reg rx_trans_active;
+	reg rx_error;
+	reg [7:0] rx_data;
+	reg get_rx_data;
+	reg store_rx_packet_data;
+	reg [7:0] rx_packet_data;
+	reg [6:0] buffer_occupancy;
+	reg store_tx_data;
+	reg [7:0] tx_data;
+	reg tx_error;
+	reg tx_trans_active;
+	reg [3:0] tx_packet; 
+	reg [7:0] tx_packet_data;
+	reg get_tx_packet_data;
+	
+// AHB LITE MODULE
+ahb_lite_slave AHB(
+	.clk(clk), 
+	.n_rst(n_rst), 
+	.hsel(hsel), 
+	.haddr(haddr),
+	.hsize(hsize),
+	.htrans(htrans),
+	.hwrite(hwrite),
+	.hwdata(hwdata), 
+	.rx_packet(rx_packet),
+	.rx_data_ready(rx_data_ready),
+	.rx_trans_active(rx_trans_active),
+	.rx_error(rx_error), 
+	.buffer_occupancy(buffer_occupancy),
+	.rx_data(rx_data),
+	.tx_trans_active(tx_trans_active),
+	.tx_error(tx_error),
+	.hrdata(hrdata), 
+	.hready(hready),
+	.hresp(hresp),
+	.clear(clear),
+	.get_rx_data(get_rx_data),
+	.store_tx_data(store_tx_data), 
+	.tx_data(tx_data),
+	.tx_packet(tx_packet)
 );
 
-// AHB LITE MODULE
-
-
 // DATA BUFFER MODULE
-
-
+databuffer DATABUFF(
+	.clk(clk), 
+	.n_rst(n_rst), 
+	.clear(clear),
+	.flush(flush), 
+	.get_rx_data(get_rx_data),
+	.get_tx_packet_data(get_tx_packet_data),
+	.store_tx_data(store_tx_data),
+	.store_rx_packet_data(store_rx_packet_data),
+	.tx_data(tx_data),
+	.rx_packet_data(rx_packet_data),
+	.buffer_occupancy(buffer_occupancy),
+	.rx_data(rx_data),
+	.tx_packet_data(tx_packet_data)
+);
 
 // USB TX MODULE
-
-
+usb_tx USBTX(
+	.clk(clk),
+	.n_rst(n_rst),
+	.tx_packet(tx_packet), 
+	.tx_packet_data(tx_packet_data),
+	.buffer_occupancy(buffer_occupancy),
+	.tx_error(tx_error),
+	.get_tx_packet_data(get_tx_packet_data),
+	.tx_transfer_active(tx_trans_active),
+	.Dplus_out(dplus_out),
+	.Dminus_out(dminus_out)
+);
 
 // USB RX MODULE
-
+usb_rx USBRX(
+	.clk(clk),
+	.n_rst(n_rst),
+	.d_plus(dplus_in),
+	.d_minus(dminus_in),
+	.r_enable(),
+	.r_data(),
+	.empty(),
+	.full(),
+	.rcving(),
+	.r_error(rx_error),
+	.PID()
+);
 
 endmodule
