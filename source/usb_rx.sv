@@ -22,11 +22,14 @@ module usb_rx (
   logic EOP_detect;
   logic shift_enable;
   logic [23:0] recv_data;
+  logic [7:0] sync_byte_data;
+  logic [7:0] pid_data;
   logic write_en;
   logic PID_mode;
   logic PID_error;
   logic PID_clear;
   logic [3:0] PID_byte;
+  logic enable_timer;
 
   //main mapped working
   sync_high s_h (
@@ -63,7 +66,7 @@ module usb_rx (
   timer_rx t1 (
     .clk(clk), 
     .n_rst(n_rst), 
-    .enable_timer(edge_detect), 
+    .enable_timer(enable_timer), 
     .shift_enable(shift_enable), 
     .byte_sent(byte_received));
 
@@ -73,7 +76,9 @@ module usb_rx (
     .shift_enable(shift_enable), 
     .d_sent(d_sent), 
     .rcv_data(recv_data), 
-    .rx_packet_data(rx_packet_data));
+    .rx_packet_data(rx_packet_data),
+    .sync_byte_data(sync_byte_data),
+    .pid_data(pid_data));
   
   control_rx c1 (
     .clk(clk), 
@@ -81,7 +86,7 @@ module usb_rx (
     .edge_detect(edge_detect), 
     .eop(EOP_detect), 
     .shift_enable(shift_enable), 
-    .rcv_data(rx_packet_data), 
+    .rcv_data(sync_byte_data), 
     .byte_received(byte_received), 
     .PID_error(PID_error), 
     .PID_byte(PID_byte), 
@@ -91,12 +96,14 @@ module usb_rx (
     .PID_mode(PID_mode), 
     .buffer_occupancy(buffer_occupancy),
     .rx_trans_active(rx_trans_active), 
-    .rx_data_ready(rx_data_ready));
+    .rx_data_ready(rx_data_ready),
+    .enable_timer(enable_timer),
+    .flush(flush));
 
   pid_rx p1 (
     .clk(clk), 
     .n_rst(n_rst),
-    .rcv_data(recv_data[7:0]), 
+    .rcv_data(pid_data), 
     .PID_clear(PID_clear), 
     .PID_mode(PID_mode), 
     .PID_err(PID_error), 

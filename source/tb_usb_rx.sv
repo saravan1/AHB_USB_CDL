@@ -19,6 +19,8 @@ module tb_usb_rx ();
   logic [7:0] tb_test_byte;
   logic [3:0] tb_PID;
   logic [3:0] tb_expected_PID;
+  logic [7:0] tb_expected_rx_packet_data;
+  logic tb_expected_rx_error;
   integer tb_count_one;
   integer tb_bit_num;
   integer tb_test_num;
@@ -62,7 +64,7 @@ module tb_usb_rx ();
   task send_PID;
     input logic [3:0]PID;
   begin
-    send_byte({PID[0],PID[1],PID[2],PID[3],~PID[0],~PID[1],~PID[2],~PID[3]});
+    send_byte({~PID[3],~PID[2],~PID[1],~PID[0],PID[3],PID[2],PID[1],PID[0]});
   end
   endtask
 
@@ -71,12 +73,12 @@ module tb_usb_rx ();
   begin
     @(posedge tb_clk);
     tb_bit_num = 0;
-    for(i = 0; i < 3; i++ ) begin
-      tb_dplus_in = 0;
-      tb_dminus_in = 0;
-      #(CLK_PERIOD * 8);
-      tb_bit_num++;
-    end
+ //   for(i = 0; i < 3; i++ ) begin
+    tb_dplus_in = 0;
+    tb_dminus_in = 0;
+    #(CLK_PERIOD * 5);
+    tb_bit_num++;
+ //   end
     tb_dplus_in = 1;
     #(CLK_PERIOD * 8);
   end
@@ -93,15 +95,15 @@ module tb_usb_rx ();
         tb_dminus_in = ~tb_dplus_in;
         tb_count_one = 0;
     end
-    #(CLK_PERIOD * 8);
+    #(CLK_PERIOD * 5);
     tb_bit_num ++;
-    if(!(tb_count_one < 6)) begin
-        tb_count_one = 0;
-        tb_dplus_in =  ~tb_dplus_in;
-        tb_dminus_in = ~tb_dplus_in;
-        #(CLK_PERIOD * 8);
-        tb_bit_num ++;
-      end
+    // if(!(tb_count_one < 6)) begin
+    //     tb_count_one = 0;
+    //     tb_dplus_in =  ~tb_dplus_in;
+    //     tb_dminus_in = ~tb_dplus_in;
+    //     #(CLK_PERIOD * 8);
+    //     tb_bit_num ++;
+    // end
   end
   endtask
 
@@ -121,23 +123,30 @@ module tb_usb_rx ();
   // end
   // endtask
 
-  task check_err;
+  task check_outputs;
   begin
-    if(tb_rx_error == 1) begin
-      $info("All Good: %d. %s", tb_test_num, tb_test_description);
+    if(tb_rx_error == tb_expected_rx_error) begin
+      $info("Correct rx error output: %d. %s", tb_test_num, tb_test_description);
     end else begin
-      $info("Bad Output: %d. %s", tb_test_num, tb_test_description);
+      $info("Incorrect rx error output: %d. %s", tb_test_num, tb_test_description);
+    end
+    
+    if(tb_rx_packet_data == tb_expected_rx_packet_data) begin
+      $info("Correct rx_packet_data output: Pid: %d. %s", tb_test_num, tb_test_description);
+    end 
+    else begin
+      $info("Incorrect rx_packet_data output: %d. %s", tb_test_num, tb_test_description);
     end
   end
   endtask
 
   task check_PID;
-    input logic [3:0] expected_PID;
   begin
-    if(tb_PID == expected_PID) begin
-      $info("All Good: Pid: %d. %s", tb_test_num, tb_test_description);
-    end else begin
-      $info("Bad Output: PID incorrect: %d. %s", tb_test_num, tb_test_description);
+   if(tb_rx_packet == tb_expected_PID) begin
+      $info("Correct rx_packet output: Pid: %d. %s", tb_test_num, tb_test_description);
+    end 
+    else begin
+      $info("Incorrect rx_packet output: %d. %s", tb_test_num, tb_test_description);
     end
   end
   endtask
@@ -170,6 +179,7 @@ module tb_usb_rx ();
     tb_test_num = 0;
     tb_expected_PID = '1;
     tb_count_one = 0;
+    tb_buffer_occupancy = 7'd16;
 
     // Test Case 1 // 
     // reset DUT
@@ -180,69 +190,308 @@ module tb_usb_rx ();
     #(CLK_PERIOD * 3);
 
     // Test Case 2 // 
-    // send a byte 
+    // send a an ACK
     tb_test_num++;
-    tb_test_description = "send a byte";
+    tb_test_description = "send a ACK";
     tb_bit_num = 0;
-    reset_dut();
-    #(CLK_PERIOD * 3);
-    tb_test_byte = 8'b01010101;
-    send_sync();
-    tb_expected_PID = 4'b1000;
-    send_PID(tb_expected_PID);
-    check_PID(tb_expected_PID);
-    send_byte(tb_test_byte);
-    send_eop();
-    #(CLK_PERIOD * 3);
-    //read_fifo(tb_test_byte);
-
-    // Test Case 3 //
-    // send three bytes
-    tb_test_num++;
-    tb_test_description = "send three bytes";
-    tb_bit_num = 0;
+    tb_expected_PID = 4'b0010;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b11111111;
     reset_dut();
     #(CLK_PERIOD * 3);
     send_sync();
-    tb_expected_PID = 4'b0001;
-    send_PID(tb_expected_PID);
-    check_PID(tb_expected_PID);
-    tb_test_byte = 8'b00000000;
-    send_byte(tb_test_byte);
-    tb_test_byte = 8'b01000000;
-    send_byte(tb_test_byte);
-    tb_test_byte = 8'b01100001;
-    send_byte(tb_test_byte);
-    send_eop();
+    tb_PID = 4'b0010;
+    send_PID(tb_PID);
     #(CLK_PERIOD * 3);
-   // read_fifo(8'b00000000);
-    #(CLK_PERIOD);
-   // read_fifo(8'b01000000);
-    #(CLK_PERIOD);
-  //  read_fifo(8'b01100001);
+    check_PID();
+    check_outputs();
+    send_eop();
 
-    // Test Case 4 // 
-    // SYNC Error case
+
+    // Test Case 3// 
+    // send a Data0
     tb_test_num++;
-    tb_test_description = "SYNC err case";
+    tb_test_description = "send Data0";
     tb_bit_num = 0;
+    tb_expected_PID = 4'b0011;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b01010101;
     reset_dut();
     #(CLK_PERIOD * 3);
-    send_bit(0);
-    send_bit(0);
-    send_bit(0);
-    send_bit(0);
-    send_bit(0);
-    send_bit(0);
-    send_bit(0);
-    send_bit(0);
-    tb_test_byte = 8'b01010000;
-    tb_expected_PID = 4'b0001;
-    send_PID(tb_expected_PID);
-    check_err();
-    send_byte(tb_test_byte);
+    send_sync();
+    tb_PID = 4'b0011;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+    check_outputs();
     send_eop();
-    #(CLK_PERIOD * 8);
+
+    //  // Test Case 4// 
+    // send a Data1
+    tb_test_num++;
+    tb_test_description = "send Data1";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1011;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b00110011;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1011;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b11001100);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+    check_outputs();
+    send_eop();
+
+    // // Test Case 5// 
+    // // send a Data0
+    tb_test_num++;
+    tb_test_description = "send Data1 Multiple Bytes";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1011;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b01000000;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1011;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+     #(CLK_PERIOD * 1);
+    send_byte(8'b10101010);
+     #(CLK_PERIOD * 1);
+    send_byte(8'b10101010);
+     #(CLK_PERIOD * 1);
+    send_byte(8'b10101010);
+     #(CLK_PERIOD * 1);
+    send_byte(8'b00000010);
+     #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+     #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+    check_outputs();
+    send_eop();
+   
+
+    // Test Case 6// 
+    // send a Data0
+    tb_test_num++;
+    tb_test_description = "send Data1 - 2Bytes";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1011;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b11010010;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1011;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b11111111);
+    check_outputs();
+    send_eop();
+
+    // Test Case 7// 
+    // send a Data0
+    tb_test_num++;
+    tb_test_description = "send Data1 - 1Bytes";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1011;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b00000001;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1011;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    check_outputs();
+    send_eop();
+
+    // Test Case 7
+    // send a IN
+    tb_test_num++;
+    tb_test_description = "send Token - IN";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1001;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b10010110;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1001;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b10101010);
+    check_outputs();
+    send_eop();
+
+    // Test Case 8
+    // send a OUT
+    tb_test_num++;
+    tb_test_description = "send Token - OUT";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b0001;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b10000111;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b0001;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 1);
+    send_byte(8'b10101010);
+    check_outputs();
+    send_eop();
+    
+    // // Test Case 9
+    // // send a Data0
+    tb_test_num++;
+    tb_test_description = "send Token - OUT Error";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b0001;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b00000001;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b0001;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 3);
+    check_outputs();
+    send_eop();
+
+    // // Test Case 10
+    // // send a Data0
+    tb_test_num++;
+    tb_test_description = "send Token - IN Error";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1001;
+    tb_expected_rx_error = 1'b0;
+    tb_expected_rx_packet_data = 8'b00000001;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1001;
+    tb_expected_PID = 4'b1001;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 3);
+    check_outputs();
+    send_eop();
+
+    // // Test Case 11
+    // // send a Data0
+    tb_test_num++;
+    tb_test_description = "Invalid PID";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1111;
+    tb_expected_rx_error = 1'b1;
+    tb_expected_rx_packet_data = 8'b11111111;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_sync();
+    tb_PID = 4'b1111;
+    send_PID(tb_PID);
+    #(CLK_PERIOD * 1);
+    check_PID();
+    #(CLK_PERIOD * 2);
+    check_outputs();
+    send_eop();
+
+    // // Test Case 12
+    // // invalid sync
+    tb_test_num++;
+    tb_test_description = "Invalid Sync";
+    tb_bit_num = 0;
+    tb_expected_PID = 4'b1001;
+    tb_expected_rx_error = 1'b1;
+    tb_expected_rx_packet_data = 8'b11111111;
+    reset_dut();
+    #(CLK_PERIOD * 3);
+    send_byte(8'b10101010);
+    #(CLK_PERIOD * 3);
+    check_outputs();
+    send_eop();
+    $stop;
+
+
+  //   // Test Case 3 //
+  //   // send three byte
+  //   tb_test_num++;
+  //   tb_test_description = "send three bytes";
+  //   tb_bit_num = 0;
+  //   reset_dut();
+  //   #(CLK_PERIOD * 3);
+  //   send_sync();
+  //   tb_expected_PID = 4'b0001;
+  //   send_PID(tb_expected_PID);
+  //   check_PID(tb_expected_PID);
+  //   tb_test_byte = 8'b00000000;
+  //   send_byte(tb_test_byte);
+  //   tb_test_byte = 8'b01000000;
+  //   send_byte(tb_test_byte);
+  //   tb_test_byte = 8'b01100001;
+  //   send_byte(tb_test_byte);
+  //   send_eop();
+  //   #(CLK_PERIOD * 3);
+  //  // read_fifo(8'b00000000);
+  //   #(CLK_PERIOD);
+  //  // read_fifo(8'b01000000);
+  //   #(CLK_PERIOD);
+  // //  read_fifo(8'b01100001);
+
+  //   // Test Case 4 // 
+  //   // SYNC Error case
+  //   tb_test_num++;
+  //   tb_test_description = "SYNC err case";
+  //   tb_bit_num = 0;
+  //   reset_dut();
+  //   #(CLK_PERIOD * 3);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   send_bit(0);
+  //   tb_test_byte = 8'b01010000;
+  //   tb_expected_PID = 4'b0001;
+  //   send_PID(tb_expected_PID);
+  //   check_err();
+  //   send_byte(tb_test_byte);
+  //   send_eop();
+  //   #(CLK_PERIOD * 8);
 
 //     // test case 5 EOP err case
 //     tb_test_num++;

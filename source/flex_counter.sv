@@ -52,4 +52,5 @@ module flex_counter
 			update_flag = 1'b0;
 		end
 	end
+	
 endmodule
