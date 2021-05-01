@@ -15,15 +15,15 @@ module decoder (
   //ff logic on negedge and posedge
   always_ff @(posedge clk, negedge n_rst) 
   begin
-    if(n_rst != 0) 
-    begin
-      main_hold <= dplus_in;
-      end_hold <= n_hold;
-    end 
-    else 
+    if(n_rst == 1'b0) 
     begin
       main_hold <= 1;
       end_hold <= 1;
+    end 
+    else 
+    begin
+      main_hold <= dplus_in;
+      end_hold <= n_hold;
     end
   end
 

@@ -13,6 +13,7 @@ module tb_ahb_lite_usb();
 // Timing related constants
 localparam CLK_PERIOD = 10;
 localparam BUS_DELAY  = 800ps; // Based on FF propagation delay
+localparam PROPAGATION_DELAY = 0.8; 
 
 // Sizing related constants
 localparam DATA_WIDTH      = 4;
@@ -60,6 +61,7 @@ bit   [DATA_MAX_BIT:0] tb_test_data [];
 string                 tb_check_tag;
 logic                  tb_mismatch;
 logic                  tb_check;
+logic                  tb_bit_num;
 integer                tb_i;
 
 //*****************************************************************************
@@ -81,7 +83,7 @@ logic                   tb_expected_dminus_out;
 logic                          tb_hsel;
 logic [1:0]                    tb_htrans;
 logic [(ADDR_WIDTH - 1):0]     tb_haddr;
-logic [2:0]                    tb_hsize;
+logic [1:0]                    tb_hsize;
 logic                          tb_hwrite;
 logic [((DATA_WIDTH*8) - 1):0] tb_hwdata;
 logic [((DATA_WIDTH*8) - 1):0] tb_hrdata;
@@ -140,7 +142,7 @@ ahb_lite_bus_cdl BFM (.clk(tb_clk),
 //*****************************************************************************
 ahb_lite_usb DUT(
 	.clk(tb_clk),
-	.n_rst(tb_nrst),
+	.n_rst(tb_n_rst),
 	.haddr(tb_haddr),
 	.hsel(tb_hsel),
 	.htrans(tb_htrans),
@@ -216,6 +218,112 @@ begin
   tb_check =1'b0;
 end
 endtask
+
+  task send_byte;
+    input logic [7:0] target;
+    integer i;
+  begin
+    @(posedge tb_clk);
+    for(i =0; i < 8; i++ ) begin
+      send_bit(target[i]);
+    end
+  end
+  endtask
+
+  task send_sync;
+  begin
+    send_byte(8'b10000000);
+  end
+  endtask
+
+  task send_PID;
+    input logic [3:0]PID;
+  begin
+    send_byte({~PID[3],~PID[2],~PID[1],~PID[0],PID[3],PID[2],PID[1],PID[0]});
+  end
+  endtask
+
+  task send_eop;
+    integer i;
+  begin
+    @(posedge tb_clk);
+    tb_dplus_in = 0;
+    tb_dminus_in = 0;
+    #(CLK_PERIOD * 5);
+
+    tb_dplus_in = 1;
+    #(CLK_PERIOD * 8);
+  end
+  endtask
+
+  task send_bit;
+    input logic target;
+  begin
+    if(target == 0) begin
+        tb_dplus_in =  ~tb_dplus_in;
+        tb_dminus_in = ~tb_dplus_in;
+    end
+    #(CLK_PERIOD * 5);
+  end
+  endtask
+
+//Task to check outputs
+task check_init;
+	input logic [7:0] sync;
+	input logic [7:0] pid;
+	input string check_tag;
+	integer i;
+begin
+	for(i = 0; i < 8; i += 1) begin
+		#(5*CLK_PERIOD);
+		if(sync[7-i] == tb_dplus_out) begin
+		      $info("Correct D plus output %s during %s test case", check_tag, tb_test_case);
+		end else begin
+		      $info("Incorrect D plus output %s during %s test case", check_tag, tb_test_case);
+		end
+		if(!sync[7-i] == tb_dminus_out) begin
+		      $info("Correct D minus output %s during %s test case", check_tag, tb_test_case);
+		end else begin
+		      $info("Incorrect D minus output %s during %s test case", check_tag, tb_test_case);
+		end
+	end
+	for(i = 0; i < 8; i += 1) begin
+		if(pid[7-i] == tb_dplus_out) begin
+		      $info("Correct D plus output %s during %s test case", check_tag, tb_test_case);
+		end else begin
+		      $info("Incorrect D plus output %s during %s test case", check_tag, tb_test_case);
+		end
+		if(!pid[7-i] == tb_dminus_out) begin
+		      $info("Correct D minus output %s during %s test case", check_tag, tb_test_case);
+		end else begin
+		      $info("Incorrect D minus output %s during %s test case", check_tag, tb_test_case);
+		end
+		#(5*CLK_PERIOD);
+	end
+end
+endtask
+
+task check_data;
+	input logic [7:0] data;
+	input string check_tag;
+	integer i; 
+begin
+	for(i = 0; i < 8; i += 1) begin
+		if(data[7-i] == tb_dplus_out) begin
+		      $info("Correct D minus output %s during %s test case", check_tag, tb_test_case);
+		end else begin
+		      $info("Incorrect D minus output %s during %s test case", check_tag, tb_test_case);
+		end
+		if(!data[7-i] == tb_dminus_out) begin
+		      $info("Correct D minus output %s during %s test case", check_tag, tb_test_case);
+		end else begin
+		      $info("Incorrect D minus output %s during %s test case", check_tag, tb_test_case);
+		end
+		#(5 * CLK_PERIOD);
+	end
+end
+endtask
+
 
 //*****************************************************************************
 // Bus Model Usage Related TB Tasks
@@ -294,6 +402,8 @@ initial begin
   tb_mismatch        = 1'b0;
   // Initialize all of the directly controled DUT inputs
   tb_n_rst          = 1'b1;
+  tb_dplus_in       = 1;
+  tb_dminus_in      = 0;
   // Initialize all of the bus model control inputs
   tb_model_reset          = 1'b0;
   tb_enable_transactions  = 1'b0;
@@ -306,7 +416,7 @@ initial begin
   tb_transaction_size     = 3'd0;
 
   // Wait some time before starting first test case
-  #(0.1);
+  #(0.3);
 
   // Clear the bus model
   reset_model();
@@ -321,7 +431,127 @@ initial begin
   // Reset the DUT
   reset_dut();
 
+  //*****************************************************************************
+  // Test Case: USB RX to AHB LITE - SEND IN TOKEN
+  //*****************************************************************************
+  // Update Navigation Info
+  tb_test_case     = "SEND IN TOKEN";
+  tb_test_case_num = tb_test_case_num + 1;
+
+  // // Reset the DUT to isolate from prior test case
+  reset_dut();
+  #(CLK_PERIOD * 5);
+  send_sync();
+  send_PID(4'b1001);
+  send_byte(8'b00010111);
+  send_byte(8'b00010111);
+  // Enqueue the needed transactions
+  enqueue_transaction(1'b1, 1'b0, 4'h4, {8'b00000010}, 1'b0, 2'd0);
+  // Run the transactions via the model
+  execute_transactions(1);
+  send_eop();
+
+  #(CLK_PERIOD * 8);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = {16'd0,16'd2};
+  tb_expected_hready = 1'b1;
+  check_outputs("after reading data status");
+
+  // Give some visual spacing between check and next test case start
+  #(CLK_PERIOD * 3);
+
 //*****************************************************************************
+  // Test Case: USB RX to AHB LITE - SEND NEW DATA/ READ STATUS
+  //*****************************************************************************
+  // Update Navigation Info
+  tb_test_case     = "SEND MULTIPLE BYTES TO DATA BUFFER";
+  tb_test_case_num = tb_test_case_num + 1;
+
+  // // Reset the DUT to isolate from prior test case
+  reset_dut();
+  #(CLK_PERIOD * 5);
+  send_sync();
+  send_PID(4'b0011);
+  send_byte(8'b11110000);
+  send_byte(8'b11110000);
+  send_byte(8'b11110000);
+  send_byte(8'b11110000);
+  send_byte(8'b00010111);
+  send_byte(8'b00010111);
+  send_byte(8'b00010111);
+  send_byte(8'b11000011);
+  send_byte(8'b00010111);
+  send_byte(8'b11111111);
+  send_byte(8'b11111111);
+  // Enqueue the needed transactions
+  enqueue_transaction(1'b1, 1'b0, 4'h4, {8'b00000001}, 1'b0, 2'd0);
+  // Run the transactions via the model
+  execute_transactions(1);
+  send_eop();
+
+  #(CLK_PERIOD * 8);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = {16'd0,16'd1};
+  tb_expected_hready = 1'b1;
+  check_outputs("after reading data status");
+
+  // Give some visual spacing between check and next test case start
+  #(CLK_PERIOD * 3);
+
+//*****************************************************************************
+  // Test Case: Read Data Buffer Register
+  //*****************************************************************************
+  // Update Navigation Info
+  tb_test_case     = "READ 4 BYTES FROM DATA BUFFER";
+
+  // Enqueue the needed transactions
+  tb_test_data = '{8'h1};
+  enqueue_transaction(1'b1, 1'b0, 4'h0, tb_test_data,1'b0, 2'd3);
+  // Run the transactions via the model
+  execute_transactions(1);
+  #(CLK_PERIOD * 3);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = {8'b00001111, 8'b00001111, 8'b00001111, 8'b00001111};
+  tb_expected_hready = 1'b1;
+  // Check the DUT outputs
+  check_outputs("READ 4 BYTES FROM DATA BUFFER");
+ 
+  // Give some visual spacing between check and next test case start
+  #(CLK_PERIOD * 3);
+
+   //*****************************************************************************
+  // Test Case: Flush Data Buffer Register
+  //*****************************************************************************
+  // Update Navigation Info
+  tb_test_case     = "FLUSH FIFO";
+
+  // Enqueue the needed transactions
+  tb_test_data = '{32'd1}; 
+  enqueue_transaction(1'b1, 1'b1, 4'hd, tb_test_data,1'b0, 2'd0);
+
+  // Enqueue the 'check' read
+  enqueue_transaction(1'b1, 1'b0, 4'hd, tb_test_data, 1'b0, 2'd0);
+  
+  // Run the transactions via the model
+  execute_transactions(2);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = 32'd1;
+  tb_expected_hready = 1'b1;
+  // Check the DUT outputs
+   check_outputs("FLUSH FIFO");
+ 
+  // Give some visual spacing between check and next test case start
+  #(CLK_PERIOD * 3);
+
+  //*****************************************************************************
   // Test Case: AHB LITE to USB TX
   //*****************************************************************************
   // Update Navigation Info
@@ -331,15 +561,159 @@ initial begin
   // Reset the DUT to isolate from prior test case
   reset_dut();
 
-//*****************************************************************************
-  // Test Case: USB RX to AHB LITE
+  // Write DATA TO FIFO FIRST
+  // Enqueue the needed transactions
+  tb_test_data = '{32'b10101010101010101010101010101010}; 
+  enqueue_transaction(1'b1, 1'b1, 4'h0, tb_test_data,1'b0, 2'd3);
+  
+  // Run the transactions via the model
+  execute_transactions(1);
+  #(CLK_PERIOD * 3);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = 32'd0;
+  tb_expected_hready = 1'b1;
+  // Check the DUT outputs
+  check_outputs("Write to Data Buffer Register");
+ 
+  // Give some visual spacing between check and next test case start
+  #(CLK_PERIOD * 3);
+
+  //*****************************************************************************
+  // Test Case: Write/ Read TX Packet CTRL Reg
   //*****************************************************************************
   // Update Navigation Info
-  tb_test_case     = "READ STATUS NEW DATA";
+  tb_test_case     = "Write/ Read TX Packet CTRL Reg";
+
+  // Enqueue the needed transactions
+  tb_test_data = '{8'd1};
+  enqueue_transaction(1'b1, 1'b1, 4'hC, tb_test_data, 1'b0, 2'd1);
+
+  enqueue_transaction(1'b1, 1'b0, 4'hC, tb_test_data, 1'b0, 2'd1);
+  // Run the transactions via the model
+  execute_transactions(2);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = 32'd1;
+  tb_expected_hready = 1'b1;
+  // Check the DUT outputs
+  check_outputs("Write/ Read TX Packet CTRL Reg");
+ 
+  // Give some visual spacing between check and next test case start
+  #(CLK_PERIOD * 3);
+
+  tb_test_case = "DATA0 packet transmission";
+  //check_init(8'b01010100, 8'b00010100, "after DATA0");
+  //check_data(8'b00110011, "after DATA0");
+  #(125*CLK_PERIOD);
+   tb_test_data = '{8'd0};
+  enqueue_transaction(1'b1, 1'b1, 4'hC, tb_test_data, 1'b0, 2'd1);
+
+  enqueue_transaction(1'b1, 1'b0, 4'hC, tb_test_data, 1'b0, 2'd1);
+  // Run the transactions via the model
+  execute_transactions(2);
+
+  #(CLK_PERIOD * 3);
+  //check_data(8'b00110011, "after DATA0");
+  #(125*CLK_PERIOD);
+  //check_data(8'b00110011, "after DATA0");
+  #(125*CLK_PERIOD);
+
+  #(CLK_PERIOD * 3);
+  
+  //*****************************************************************************
+  // Test Case: RX error
+  //*****************************************************************************
+  // Update Navigation Info
+  tb_test_case     = "RX ERROR";
   tb_test_case_num = tb_test_case_num + 1;
 
-  // Reset the DUT to isolate from prior test case
   reset_dut();
+  #(CLK_PERIOD * 3);
+  send_sync();
+  send_PID(4'b0001);
+  // check_PID();
+  #(CLK_PERIOD * 1);
+  send_byte(8'b10101010);
+  #(CLK_PERIOD * 5);
+  send_eop();
+
+  #(CLK_PERIOD * 5);
+
+  tb_test_data = '{32'd1}; 
+  // Enqueue the 'check' read
+  enqueue_transaction(1'b1, 1'b0, 4'h6, tb_test_data, 1'b0, 2'd1);
+  
+  // Run the transactions via the model
+  execute_transactions(1);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = 32'd1;
+  tb_expected_hready = 1'b1;
+  // Check the DUT outputs
+  check_outputs("RX ERROR");
+
+  #(CLK_PERIOD * 3);
+
+  //*****************************************************************************
+  // Test Case: TX error
+  //*****************************************************************************
+  // Update Navigation Info
+  tb_test_case     = "TX ERROR";
+  tb_test_case_num = tb_test_case_num + 1;
+
+  reset_dut();
+
+  // FLUSH FIFO
+   // Enqueue the needed transactions
+  tb_test_data = '{32'd1}; 
+  enqueue_transaction(1'b1, 1'b1, 4'hd, tb_test_data,1'b0, 2'd0);
+  
+  // Run the transactions via the model
+  execute_transactions(1);
+
+  #(CLK_PERIOD * 5);
+
+  // Send TX CTRL new value
+  tb_test_data = '{32'd1};
+  enqueue_transaction(1'b1, 1'b1, 4'hC, tb_test_data, 1'b0, 2'd0);
+
+  enqueue_transaction(1'b1, 1'b0, 4'hC, tb_test_data, 1'b0, 2'd0);
+  // Run the transactions via the model
+  execute_transactions(2);
+
+  #(CLK_PERIOD * 40);
+
+   // Send TX CTRL new value
+  tb_test_data = '{32'd0};
+  enqueue_transaction(1'b1, 1'b1, 4'hC, tb_test_data, 1'b0, 2'd0);
+
+  enqueue_transaction(1'b1, 1'b0, 4'hC, tb_test_data, 1'b0, 2'd0);
+  // Run the transactions via the model
+  execute_transactions(2);
+
+    #(CLK_PERIOD * 40);
+
+  // tb_test_data = '{32'd1};
+  // // read error register
+  // enqueue_transaction(1'b1, 1'b0, 4'h7, tb_test_data, 1'b0, 2'd0);
+  // // Run the transactions via the model
+  // execute_transactions(1);
+
+  // Check the DUT outputs
+  tb_expected_hresp = 1'b0;
+  tb_expected_hrdata = 32'd1;
+  tb_expected_hready = 1'b1;
+  // Check the DUT outputs
+  //check_outputs("TX ERROR");
+
+  #(CLK_PERIOD * 3);
+
+  $stop;
+end
 
 endmodule
 

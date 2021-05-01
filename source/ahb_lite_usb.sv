@@ -27,7 +27,7 @@ module ahb_lite_usb
 );
 	reg clear;
 	reg flush;
-	reg [2:0] rx_packet;
+	reg [3:0] rx_packet;
 	reg rx_data_ready;
 	reg rx_trans_active;
 	reg rx_error;
@@ -104,18 +104,20 @@ usb_tx USBTX(
 );
 
 // USB RX MODULE
-usb_rx USBRX(
-	.clk(clk),
-	.n_rst(n_rst),
-	.d_plus(dplus_in),
-	.d_minus(dminus_in),
-	.r_enable(),
-	.r_data(),
-	.empty(),
-	.full(),
-	.rcving(),
-	.r_error(rx_error),
-	.PID()
-);
+  usb_rx USBRX (
+    .clk(clk),
+    .n_rst(n_rst),
+    .dplus_in(dplus_in),
+    .dminus_in(dminus_in),
+    .buffer_occupancy(buffer_occupancy),
+    .rx_packet_data(rx_packet_data),
+    .rx_packet(rx_packet),
+    .store_rx_packet_data(store_rx_packet_data),
+    .flush(flush),
+    .rx_error(rx_error),
+    .rx_trans_active(rx_trans_active),
+    .rx_data_ready(rx_data_ready)
+  );
+
 
 endmodule

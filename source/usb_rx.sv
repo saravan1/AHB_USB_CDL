@@ -18,20 +18,26 @@ module usb_rx (
   logic dminus_in_sync;
   logic edge_detect;
   logic d_sent;
-  logic bit_stuff;
   logic EOP_detect;
   logic shift_enable;
   logic [23:0] recv_data;
-  logic [7:0] sync_byte_data;
-  logic [7:0] pid_data;
-  logic write_en;
-  logic PID_mode;
-  logic PID_error;
-  logic PID_clear;
-  logic [3:0] PID_byte;
+  // logic [7:0] sync_byte_data;
+  // logic [7:0] pid_data;
+  // logic PID_mode;
+  // logic PID_error;
+  // logic PID_clear;
+  // logic [3:0] PID_byte;
   logic enable_timer;
+  logic byte_received;
 
   //main mapped working
+  // sync_high s_h (
+  //   .clk(clk), 
+  //   .n_rst(n_rst), 
+  //   .async_in(dplus_in), 
+  //   .sync_out(dplus_in_sync));
+
+  
   sync_high s_h (
     .clk(clk), 
     .n_rst(n_rst), 
@@ -47,18 +53,18 @@ module usb_rx (
   edge_detector e1 (
     .clk(clk), 
     .n_rst(n_rst), 
-    .dplus_in(dplus_in), 
+    .dplus_in(dplus_in_sync), 
     .edge_detect(edge_detect));
 
   EOP_detector ep1 (
-    .dplus_in(dplus_in), 
-    .dminus_in(dminus_in), 
+    .dplus_in(dplus_in_sync), 
+    .dminus_in(dminus_in_sync), 
     .eop(EOP_detect));
 
   decoder d1 (
     .clk(clk), 
     .n_rst(n_rst), 
-    .dplus_in(dplus_in), 
+    .dplus_in(dplus_in_sync), 
     .shift_enable(shift_enable), 
     .eop(EOP_detect), 
     .d_sent(d_sent));
@@ -76,9 +82,10 @@ module usb_rx (
     .shift_enable(shift_enable), 
     .d_sent(d_sent), 
     .rcv_data(recv_data), 
-    .rx_packet_data(rx_packet_data),
-    .sync_byte_data(sync_byte_data),
-    .pid_data(pid_data));
+    .rx_packet_data(rx_packet_data)
+    // .sync_byte_data(sync_byte_data),
+    // .pid_data(pid_data)
+    );
   
   control_rx c1 (
     .clk(clk), 
@@ -86,28 +93,29 @@ module usb_rx (
     .edge_detect(edge_detect), 
     .eop(EOP_detect), 
     .shift_enable(shift_enable), 
-    .rcv_data(sync_byte_data), 
+    .rcv_data(recv_data[7:0]), 
     .byte_received(byte_received), 
-    .PID_error(PID_error), 
-    .PID_byte(PID_byte), 
+    // .PID_error(PID_error), 
+    // .PID_byte(PID_byte), 
     .write_en(store_rx_packet_data), 
-    .EOP_err(rx_error), 
-    .PID_clear(PID_clear), 
-    .PID_mode(PID_mode), 
+    .rx_err(rx_error), 
+    // .PID_clear(PID_clear), 
+    // .PID_mode(PID_mode), 
     .buffer_occupancy(buffer_occupancy),
     .rx_trans_active(rx_trans_active), 
     .rx_data_ready(rx_data_ready),
+    .rx_packet(rx_packet),
     .enable_timer(enable_timer),
     .flush(flush));
 
-  pid_rx p1 (
-    .clk(clk), 
-    .n_rst(n_rst),
-    .rcv_data(pid_data), 
-    .PID_clear(PID_clear), 
-    .PID_mode(PID_mode), 
-    .PID_err(PID_error), 
-    .rx_packet(rx_packet), 
-    .PID_byte(PID_byte));
+  // pid_rx p1 (
+  //   .clk(clk), 
+  //   .n_rst(n_rst),
+  //   .rcv_data(pid_data), 
+  //   .PID_clear(PID_clear), 
+  //   .PID_mode(PID_mode), 
+  //   .PID_err(PID_error), 
+  //   .rx_packet(rx_packet), 
+  //   .PID_byte(PID_byte));
   
 endmodule

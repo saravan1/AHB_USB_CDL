@@ -705,7 +705,7 @@ initial begin
 
   // Enqueue the needed transactions
   tb_tx_error = 1'b1;
-  tb_test_data = '{32'd256}; 
+  tb_test_data = '{32'd1}; 
   // Enqueue the 'check' read
   enqueue_transaction(1'b1, 1'b0, 4'h6, tb_test_data, 1'b0, 2'd1);
   
@@ -714,7 +714,7 @@ initial begin
 
   // Check the DUT outputs
   tb_expected_hresp = 1'b0;
-  tb_expected_hrdata = 32'd256;
+  tb_expected_hrdata = 32'd1;
   tb_expected_hready = 1'b1;
   tb_expected_tx_data = 8'd0;
   // Check the DUT outputs

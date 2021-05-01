@@ -6,15 +6,16 @@ module control_rx (
   input logic shift_enable,
   input logic [7:0] rcv_data,
   input logic byte_received,
-  input logic PID_error,
-  input logic [3:0] PID_byte,
+  // input logic PID_error,
+  // input logic [3:0] PID_byte,
   input logic [6:0] buffer_occupancy,
   output logic write_en,
-  output logic EOP_err,
-  output logic PID_clear,
-  output logic PID_mode,
+  output logic rx_err,
+  // output logic PID_clear,
+  // output logic PID_mode,
   output logic rx_data_ready,
   output logic rx_trans_active,
+  output logic [3:0] rx_packet,
   output logic enable_timer,
   output logic flush
 );
@@ -28,13 +29,19 @@ module control_rx (
   statelogic n_state;
   
   localparam hold_byte = 8'b00000001;
+  logic [3:0] nxt_rx_packet;
+  logic nxt_rx_err;
 
   //ff logic on posedge and negedge
   always_ff @(posedge clk, negedge n_rst) begin
     if (n_rst == 0) begin
       state <= IDLE;
+      rx_packet <= '0;
+      rx_err <= '0;
     end else begin
       state <= n_state;
+      rx_packet <= nxt_rx_packet;
+      rx_err <= nxt_rx_err;
     end
   end
 
@@ -75,21 +82,24 @@ module control_rx (
       end
       PID_CHECK: 
       begin
-        if ((PID_byte == 4'b0011) || (PID_byte == 4'b1011))
+        if((rcv_data[7:4] == 4'b1100) || (rcv_data[7:4] == 4'b1101))
+        // if ((PID_byte == 4'b0011) || (PID_byte == 4'b1011))
         begin
           n_state = DATA_IDLE;
         end
-        else if ((PID_byte == 4'b0001) || (PID_byte == 4'b1001))
+        else if ((rcv_data[7:4] == 4'b1000) || (rcv_data[7:4] == 4'b1001))
+        // else if ((PID_byte == 4'b0001) || (PID_byte == 4'b1001))
         begin
           n_state = TOKEN1;
         end
-        else if(PID_error)
-        begin
-          n_state = PID_ERR;
-        end
-        else
+        else if ((rcv_data[7:4] == 4'b0100))
         begin
           n_state = EOP_IDLE;
+        end
+        // else if(PID_error)
+        else
+        begin
+          n_state = PID_ERR;
         end
       end
       EOP_IDLE: 
@@ -222,44 +232,45 @@ module control_rx (
   always_comb
   begin  
     write_en = 1'b0;
-    case(state)
-    DATA1: write_en = 1'b1;
-    DATA2: write_en = 1'b1;
-    DATA3: write_en = 1'b1;
-    endcase
+    if(state == DATA2 && byte_received) begin
+      write_en = 1'b1;
+    end
+    else if(state == DATA3 && byte_received) begin
+      write_en = 1'b1;
+    end
   end
  
   // RX_ERROR
   always_comb
   begin  
-    EOP_err = 1'b0;
+    nxt_rx_err = rx_err;
     case(state)
-    EOP_ERR: EOP_err = 1'b1;
-    PID_ERR: EOP_err = 1'b1;
+    EOP_ERR: nxt_rx_err = 1'b1;
+    PID_ERR: nxt_rx_err = 1'b1;
     endcase
   end
 
-  // FLUSH REGISTER
-  always_comb
-  begin  
-    PID_clear = 1'b0;
-    case(state)
-    IDLE: PID_clear = 1'b1;
-    endcase
-  end
+  // // FLUSH REGISTER
+  // always_comb
+  // begin  
+  //   flush = 1'b0;
+  //   case(state)
+  //   IDLE: flush = 1'b1;
+  //   endcase
+  // end
 
-  // PID Mode
-  always_comb
-  begin  
-    PID_mode = 1'b0;
-    case(state)
-    SYN_CHK: PID_mode = 1'b1;
-    // PID_WAIT: PID_mode = 1'b1;
-    // PID_RECV: PID_mode = 1'b1;
-    PID_WAIT: PID_mode = 1'b1;
-    PID_CHECK: PID_mode = 1'b1;
-    endcase
-  end
+  // // PID Mode
+  // always_comb
+  // begin  
+  //   PID_mode = 1'b0;
+  //   case(state)
+  //   SYN_CHK: PID_mode = 1'b1;
+  //   // PID_WAIT: PID_mode = 1'b1;
+  //   // PID_RECV: PID_mode = 1'b1;
+  //   PID_WAIT: PID_mode = 1'b1;
+  //   PID_CHECK: PID_mode = 1'b1;
+  //   endcase
+  // end
 
   // RX Data Ready
   always_comb
@@ -272,7 +283,6 @@ module control_rx (
     endcase
   end
 
-  
   // ENABLE TIMER LOGIC
   always_comb
   begin  
@@ -290,6 +300,15 @@ module control_rx (
     flush = 1'b0;
     case(state)
     DATA_IDLE: flush = 1'b1;
+    endcase
+  end
+
+  // RX PACKET
+  always_comb
+  begin  
+    nxt_rx_packet = rx_packet;
+    case(state)
+    PID_CHECK: nxt_rx_packet = {rcv_data[4],rcv_data[5],rcv_data[6],rcv_data[7]}; 
     endcase
   end
 

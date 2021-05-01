@@ -17,7 +17,7 @@ module ahb_lite_slave
     input wire[1:0] htrans,
     input wire hwrite, 
     input wire[31:0] hwdata,
-    input wire [2:0] rx_packet,
+    input wire [3:0] rx_packet,
     input wire rx_data_ready,
     input wire rx_trans_active,
     input wire rx_error,
@@ -33,7 +33,7 @@ module ahb_lite_slave
     output reg get_rx_data,
     output reg store_tx_data,
     output reg [7:0] tx_data,
-    output reg [2:0] tx_packet
+    output reg [3:0] tx_packet
 );
 
     // memory
@@ -49,7 +49,7 @@ module ahb_lite_slave
     reg[1:0][15:0] data_buffer_reg;
     reg[31:0]      nxt_hrdata;
     reg            nxt_clear;
-    reg[2:0]       nxt_tx_packet;
+    reg[3:0]       nxt_tx_packet;
 
     reg            prev_hwrite;
     reg[1:0]       prev_htrans;
@@ -104,10 +104,10 @@ module ahb_lite_slave
         // status register
         mem[4'h4 >> 1] = 16'd0;
         if(rx_data_ready) mem[4'h4 >> 1] = 16'h0001;
-        else if(rx_packet == 3'd1) mem[4'h4 >> 1] = 16'h0002;
-        else if(rx_packet == 3'd2) mem[4'h4 >> 1] = 16'h0004;
-        else if(rx_packet == 3'd3) mem[4'h4 >> 1] = 16'h0008;
-        else if(rx_packet == 3'd4) mem[4'h4 >> 1] = 16'h0010;
+        else if(rx_packet == 4'b1001) mem[4'h4 >> 1] = 16'h0002;
+        else if(rx_packet == 4'b0001 ) mem[4'h4 >> 1] = 16'h0004;
+        else if(rx_packet == 4'b0010) mem[4'h4 >> 1] = 16'h0008;
+        else if(rx_packet == 4'b1010) mem[4'h4 >> 1] = 16'h0010;
         else if(rx_trans_active || get_rx_data) mem[4'h4 >> 1] = 16'h0100;
         else if(tx_trans_active || store_tx_data) mem[4'h4 >> 1] = 16'h0200;
 
@@ -238,12 +238,12 @@ module ahb_lite_slave
     end
 
     always_comb begin : TX_PACK_CTRL_LOGIC
+        nxt_tx_packet = tx_packet;
         case(mem[4'hc >> 1][7:0])
-        3'd1: nxt_tx_packet <= 3'd1; //need to change codes
-        3'd2: nxt_tx_packet <= 3'd2;
-        3'd3: nxt_tx_packet <= 3'd3;
-        3'd4: nxt_tx_packet <= 3'd4;
-        default: nxt_tx_packet = 8'd0;
+        3'd1: nxt_tx_packet = 4'b0011; //need to change codes
+        3'd2: nxt_tx_packet = 4'b0010;
+        3'd3: nxt_tx_packet = 4'b1010;
+        3'd4: nxt_tx_packet = 4'b1110;
         endcase   
     end  
 
